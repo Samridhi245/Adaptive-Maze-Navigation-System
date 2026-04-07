@@ -1,0 +1,14 @@
+{
+  "easy": {
+    "best_steps": 14,
+    "best_time": 4.0
+  },
+  "medium": {
+    "best_steps": 18,
+    "best_time": 4.0
+  },
+  "hard": {
+    "best_steps": 30,
+    "best_time": 9.0
+  }
+}
