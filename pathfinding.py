@@ -75,7 +75,7 @@ def bfs_path(maze, start, goal):
 
 
 def dfs_path(maze, start, goal):
-    """One valid path (not necessarily shortest)."""
+    
     if start == goal:
         return []
     stack = [(start, [start])]

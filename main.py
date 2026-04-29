@@ -12,6 +12,7 @@ from scores import is_better_steps, is_better_time, load_scores, save_scores
 from session import new_game_session
 from ui import (
     Button,
+    compute_layout,
     draw_algorithm_select,
     draw_algorithms_info,
     draw_game,
@@ -45,14 +46,34 @@ def main():
     steps = 0
     path = []
     hint_len = 0
+    move_history = [(0, 0)]
     game_fps = 8
     best_rec = {}
+
+    target_path = []
+    hover_path = []
+    last_move_time = 0
+    move_delay = 120
 
     win_data = {}
     lose_data = {}
 
     clock = pygame.time.Clock()
     running = True
+
+    def update_player_position(nx, ny):
+        nonlocal steps, path, hint_len, move_history
+        if 0 <= nx < maze.size and 0 <= ny < maze.size:
+            if (nx, ny) not in maze.obstacles:
+                player.x, player.y = nx, ny
+                player.energy -= 1
+                steps += 1
+                move_history.append((player.x, player.y))
+                path = []
+                hint_len = 0
+                if (nx, ny) in maze.recharge:
+                    player.energy += 5
+                maze.move_obstacles((player.x, player.y))
 
     def make_playing_buttons():
         bw, bh = 160, 44
@@ -97,7 +118,32 @@ def main():
 
     while running:
         mouse_pos = pygame.mouse.get_pos()
+        current_time = pygame.time.get_ticks()
         dt_fps = game_fps if state == config.PLAYING else 60
+
+        # Animation logic
+        if state == config.PLAYING and target_path:
+            if current_time - last_move_time > move_delay:
+                nx, ny = target_path.pop(0)
+                update_player_position(nx, ny)
+                last_move_time = current_time
+                
+                # Check if energy depleted during animation
+                if player.energy <= 0:
+                    target_path = []
+
+        # Hover path preview logic
+        hover_path = []
+        if state == config.PLAYING and maze and player and not target_path:
+            side_panel_w = 230
+            panel_gap = 14
+            cell, grid_rect, gx, gy = compute_layout(maze.size, side_panel_w + panel_gap)
+            if grid_rect.collidepoint(mouse_pos):
+                col = (mouse_pos[0] - gx) // cell
+                row = (mouse_pos[1] - gy) // cell
+                if 0 <= row < maze.size and 0 <= col < maze.size:
+                    from pathfinding import dijkstra_path
+                    hover_path = dijkstra_path(maze, (player.x, player.y), (row, col))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -144,6 +190,7 @@ def main():
                                 maze, player, start_time, steps, path, hint_len, best_rec, game_fps = new_game_session(
                                     level_key, scores
                                 )
+                                move_history = [(0, 0)]; target_path = []
                                 playing_buttons = make_playing_buttons()
                                 state = config.PLAYING
                             elif b.text.startswith("BFS"):
@@ -151,6 +198,7 @@ def main():
                                 maze, player, start_time, steps, path, hint_len, best_rec, game_fps = new_game_session(
                                     level_key, scores
                                 )
+                                move_history = [(0, 0)]; target_path = []
                                 playing_buttons = make_playing_buttons()
                                 state = config.PLAYING
                             elif b.text.startswith("DFS"):
@@ -158,6 +206,7 @@ def main():
                                 maze, player, start_time, steps, path, hint_len, best_rec, game_fps = new_game_session(
                                     level_key, scores
                                 )
+                                move_history = [(0, 0)]; target_path = []
                                 playing_buttons = make_playing_buttons()
                                 state = config.PLAYING
                             elif b.text == "Back":
@@ -173,6 +222,21 @@ def main():
                             maze, player, start_time, steps, path, hint_len, best_rec, game_fps = new_game_session(
                                 level_key, scores
                             )
+                            move_history = [(0, 0)]
+                            target_path = []
+                            
+                    if maze and player and not target_path:
+                        side_panel_w = 230
+                        panel_gap = 14
+                        cell, grid_rect, gx, gy = compute_layout(maze.size, side_panel_w + panel_gap)
+                        if grid_rect.collidepoint(pos):
+                            col = (pos[0] - gx) // cell
+                            row = (pos[1] - gy) // cell
+                            if 0 <= row < maze.size and 0 <= col < maze.size:
+                                from pathfinding import dijkstra_path
+                                new_path = dijkstra_path(maze, (player.x, player.y), (row, col))
+                                if new_path:
+                                    target_path = new_path
 
                 elif state == config.WIN:
                     for b in win_btns:
@@ -181,6 +245,7 @@ def main():
                                 maze, player, start_time, steps, path, hint_len, best_rec, game_fps = new_game_session(
                                     level_key, scores
                                 )
+                                move_history = [(0, 0)]; target_path = []
                                 playing_buttons = make_playing_buttons()
                                 state = config.PLAYING
                             elif b.text == "Home":
@@ -195,6 +260,7 @@ def main():
                                 maze, player, start_time, steps, path, hint_len, best_rec, game_fps = new_game_session(
                                     level_key, scores
                                 )
+                                move_history = [(0, 0)]; target_path = []
                                 playing_buttons = make_playing_buttons()
                                 state = config.PLAYING
                             elif b.text == "Home":
@@ -205,10 +271,14 @@ def main():
             if event.type == pygame.KEYDOWN and state == config.PLAYING:
                 if event.key == pygame.K_r:
                     maze, player, start_time, steps, path, hint_len, best_rec, game_fps = new_game_session(level_key, scores)
+                    move_history = [(0, 0)]
+                    target_path = []
                 elif event.key == pygame.K_h:
                     path = get_hint_path(algo_key, maze, (player.x, player.y), (maze.size - 1, maze.size - 1))
                     hint_len = len(path)
                 elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT):
+                    if target_path:
+                        continue  # disable keyboard during animation
                     nx, ny = player.x, player.y
                     if event.key == pygame.K_UP:
                         nx -= 1
@@ -219,16 +289,7 @@ def main():
                     elif event.key == pygame.K_RIGHT:
                         ny += 1
 
-                    if 0 <= nx < maze.size and 0 <= ny < maze.size:
-                        if (nx, ny) not in maze.obstacles:
-                            player.x, player.y = nx, ny
-                            player.energy -= 1
-                            steps += 1
-                            path = []
-                            hint_len = 0
-                            if (nx, ny) in maze.recharge:
-                                player.energy += 5
-                            maze.move_obstacles((player.x, player.y))
+                    update_player_position(nx, ny)
 
         if state == config.HOME:
             draw_home_screen(win, (title_font, body_font, small_font), home_btns, mouse_pos)
@@ -290,8 +351,10 @@ def main():
                     level_key,
                     algo_key,
                     best_rec,
+                    move_history,
                     playing_buttons,
                     mouse_pos,
+                    hover_path,
                 )
 
         elif state == config.WIN:

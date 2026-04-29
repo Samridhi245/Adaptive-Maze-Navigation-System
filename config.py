@@ -15,21 +15,23 @@ BOTTOM_H = 92
 MARGIN = 20
 
 # Theme colors
-BG_DEEP = (18, 22, 32)
-BG_PANEL = (28, 34, 48)
-BG_PANEL2 = (36, 44, 62)
+BG_DEEP = (245, 247, 250)
+BG_PANEL = (255, 255, 255)
+BG_PANEL2 = (238, 242, 247)
 ACCENT = (88, 166, 255)
 ACCENT2 = (120, 220, 180)
-TEXT_MAIN = (235, 240, 250)
-TEXT_DIM = (160, 170, 190)
-DANGER = (255, 100, 120)
-SUCCESS = (100, 230, 160)
+TEXT_MAIN = (35, 40, 48)
+TEXT_DIM = (96, 108, 124)
+DANGER = (220, 90, 110)
+SUCCESS = (80, 190, 130)
 GOAL_COLOR = (186, 120, 255)
 RECHARGE_COLOR = (60, 200, 140)
 OBSTACLE_COLOR = (220, 90, 90)
 PLAYER_COLOR = (70, 140, 255)
 PATH_HINT = (255, 210, 100)
-GRID_LINE = (55, 65, 85)
+GRID_LINE = (200, 205, 215)
+CELL_COLOR = (235, 240, 248)
+CELL_HOVER = (215, 225, 235)
 WHITE = (255, 255, 255)
 
 # Game states (finite state machine)
@@ -62,9 +64,9 @@ LEVELS = {
     "hard": {
         "label": "Hard",
         "grid": 12,
-        "obstacles": 8,
-        "recharge": 2,
-        "energy": 8,
+        "obstacles": 6,
+        "recharge": 4,
+        "energy": 18,
         "fps": 11,
     },
 }

@@ -9,7 +9,7 @@ from entities import Maze, Player
 def new_game_session(level_key, scores):
     """Fresh maze and player; reset steps, hint path, and timer."""
     cfg = config.LEVELS[level_key]
-    maze = Maze(cfg["grid"], cfg["obstacles"], cfg["recharge"])
+    maze = Maze(cfg["grid"], cfg["obstacles"], cfg["recharge"], player_energy=cfg["energy"])
     player = Player(cfg["energy"])
     start_time = pygame.time.get_ticks()
     steps = 0

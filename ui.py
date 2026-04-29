@@ -61,15 +61,15 @@ class Button:
         return self.rect.collidepoint(pos)
 
 
-def compute_layout(grid_size):
+def compute_layout(grid_size, side_panel_w=0):
     """Cell size and pixel rectangle for the maze (centered below HUD)."""
-    inner_w = config.WIN_W - 2 * config.MARGIN
+    inner_w = config.WIN_W - 2 * config.MARGIN - side_panel_w
     inner_h = config.WIN_H - config.HUD_H - config.BOTTOM_H - 2 * config.MARGIN
     side = min(inner_w, inner_h)
     cell = max(28, side // grid_size)
     gw = cell * grid_size
     gh = cell * grid_size
-    gx = (config.WIN_W - gw) // 2
+    gx = (config.WIN_W - side_panel_w - gw) // 2
     gy = config.HUD_H + config.MARGIN + (inner_h - gh) // 2
     return cell, pygame.Rect(gx, gy, gw, gh), gx, gy
 
@@ -86,9 +86,13 @@ def draw_game(
     level_key,
     algo_key,
     best_rec,
+    move_history,
     buttons,
     mouse_pos,
+    hover_path=None
 ):
+    if hover_path is None:
+        hover_path = []
     _title_f, hud_f, small_f = fonts
     win.fill(config.BG_DEEP)
 
@@ -112,7 +116,9 @@ def draw_game(
     draw_text_left(win, line1, hud_f, config.TEXT_MAIN, (config.MARGIN, 18))
     draw_text_left(win, line2, small_f, config.TEXT_DIM, (config.MARGIN, 52))
 
-    cell, grid_rect, gx, gy = compute_layout(maze.size)
+    side_panel_w = 230
+    panel_gap = 14
+    cell, grid_rect, gx, gy = compute_layout(maze.size, side_panel_w + panel_gap)
 
     frame_pad = 6
     fr = grid_rect.inflate(frame_pad * 2, frame_pad * 2)
@@ -135,8 +141,24 @@ def draw_game(
                 draw_round_rect(win, inner, config.GOAL_COLOR, 8)
                 draw_text_centered(win, "G", hud_f, config.WHITE, inner.center)
             else:
-                pygame.draw.rect(win, (40, 48, 64), inner, border_radius=8)
+                is_hovered = inner.collidepoint(mouse_pos)
+                base_color = config.CELL_HOVER if is_hovered else config.CELL_COLOR
+                pygame.draw.rect(win, base_color, inner, border_radius=8)
                 pygame.draw.rect(win, config.GRID_LINE, inner, 1, border_radius=8)
+
+            # Draw cell numbering
+            if (i, j) not in maze.obstacles:
+                num_text = str(i * gs + j + 1)
+                # Position number slightly higher or centered, smaller
+                # We use small_f (size 16), transparent-like color
+                draw_text_centered(win, num_text, small_f, (150, 160, 175), inner.center)
+
+    # Draw hover path preview
+    for (i, j) in hover_path:
+        r = pygame.Rect(gx + j * cell + 2, gy + i * cell + 2, cell - 4, cell - 4)
+        s = pygame.Surface((r.width, r.height), pygame.SRCALPHA)
+        s.fill((120, 200, 255, 90)) # subtle blue for preview
+        win.blit(s, r.topleft)
 
     for (i, j) in path:
         r = pygame.Rect(gx + j * cell + 2, gy + i * cell + 2, cell - 4, cell - 4)
@@ -148,6 +170,49 @@ def draw_game(
     draw_round_rect(win, pr, config.PLAYER_COLOR, 10)
     pygame.draw.rect(win, config.WHITE, pr, 2, border_radius=10)
     draw_text_centered(win, "P", hud_f, config.WHITE, pr.center)
+
+    panel_x = config.WIN_W - config.MARGIN - side_panel_w
+    panel_y = config.HUD_H + config.MARGIN
+    panel_h = config.WIN_H - config.HUD_H - config.BOTTOM_H - 2 * config.MARGIN
+    side_rect = pygame.Rect(panel_x, panel_y, side_panel_w, panel_h)
+    draw_round_rect(win, side_rect, config.BG_PANEL, 12)
+    pygame.draw.rect(win, config.GRID_LINE, side_rect, 1, border_radius=12)
+    draw_text_left(win, "Movement Path", small_f, config.TEXT_MAIN, (panel_x + 14, panel_y + 12))
+
+    graph_pad = 14
+    graph_top = panel_y + 42
+    graph_rect = pygame.Rect(
+        panel_x + graph_pad,
+        graph_top,
+        side_panel_w - graph_pad * 2,
+        panel_h - (graph_top - panel_y) - graph_pad,
+    )
+    draw_round_rect(win, graph_rect, config.BG_PANEL2, 10)
+    pygame.draw.rect(win, config.GRID_LINE, graph_rect, 1, border_radius=10)
+
+    gs = maze.size
+    mini_cell = min(graph_rect.width // gs, graph_rect.height // gs)
+    mini_w = mini_cell * gs
+    mini_h = mini_cell * gs
+    mini_x = graph_rect.x + (graph_rect.width - mini_w) // 2
+    mini_y = graph_rect.y + (graph_rect.height - mini_h) // 2
+
+    for i in range(gs + 1):
+        y = mini_y + i * mini_cell
+        pygame.draw.line(win, config.GRID_LINE, (mini_x, y), (mini_x + mini_w, y))
+    for j in range(gs + 1):
+        x = mini_x + j * mini_cell
+        pygame.draw.line(win, config.GRID_LINE, (x, mini_y), (x, mini_y + mini_h))
+
+    if move_history and mini_cell > 0:
+        points = []
+        for x, y in move_history:
+            px = mini_x + y * mini_cell + mini_cell // 2
+            py = mini_y + x * mini_cell + mini_cell // 2
+            points.append((px, py))
+        if len(points) >= 2:
+            pygame.draw.lines(win, config.ACCENT, False, points, 2)
+        pygame.draw.circle(win, config.PLAYER_COLOR, points[-1], max(3, mini_cell // 5))
 
     bot_top = config.WIN_H - config.BOTTOM_H
     bot_rect = pygame.Rect(0, bot_top, config.WIN_W, config.BOTTOM_H)
